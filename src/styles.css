@@ -1,0 +1,266 @@
+/*
+ * goemoji — тема по умолчанию (Discord-like).
+ * Всё настраивается через CSS-переменные на `.ge-root` или выше.
+ */
+
+.ge-root {
+  --ge-bg: #1e1f22;
+  --ge-panel: #2b2d31;
+  --ge-border: #1a1b1e;
+  --ge-text: #dbdee1;
+  --ge-muted: #949ba4;
+  --ge-hover: rgba(255, 255, 255, 0.06);
+  --ge-active: rgba(88, 101, 242, 0.4);
+  --ge-accent: #5865f2;
+  --ge-radius: 6px;
+  --ge-list-height: 320px;
+  --ge-font:
+    system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --ge-font-emoji:
+    "Apple Color Emoji", "Noto Color Emoji", "Twemoji Mozilla", "Android Emoji",
+    "Segoe UI Emoji", "Segoe UI Symbol", EmojiSymbols, sans-serif;
+
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-width: 0;
+  background: var(--ge-bg);
+  border: 1px solid var(--ge-border);
+  border-radius: var(--ge-radius);
+  color: var(--ge-text);
+  font-family: var(--ge-font);
+  font-size: 14px;
+  overflow: hidden;
+}
+
+.ge-top {
+  display: flex;
+  gap: 6px;
+  padding: 8px;
+}
+
+.ge-search {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 9px;
+  color: var(--ge-text);
+  background: var(--ge-panel);
+  border: 1px solid transparent;
+  border-radius: 4px;
+  font: inherit;
+  font-size: 13px;
+}
+
+.ge-search::placeholder {
+  color: var(--ge-muted);
+}
+
+.ge-search:focus {
+  border-color: var(--ge-accent);
+  outline: none;
+}
+
+.ge-tone-wrap {
+  position: relative;
+  flex: none;
+}
+
+.ge-tone {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  background: var(--ge-panel);
+  border: 1px solid transparent;
+  border-radius: 4px;
+  font-family: var(--ge-font-emoji);
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.ge-tone:hover,
+.ge-tone[aria-expanded="true"] {
+  background: var(--ge-hover);
+  border-color: var(--ge-accent);
+}
+
+.ge-tone-pop {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 5;
+  display: grid;
+  grid-template-columns: repeat(3, auto);
+  gap: 2px;
+  padding: 6px;
+  background: var(--ge-panel);
+  border: 1px solid var(--ge-border);
+  border-radius: var(--ge-radius);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+.ge-tone-item {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  background: none;
+  border: 0;
+  border-radius: 4px;
+  font-family: var(--ge-font-emoji);
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.ge-tone-item:hover,
+.ge-tone-item[data-active] {
+  background: var(--ge-hover);
+}
+
+.ge-tone-item[data-active] {
+  box-shadow: inset 0 0 0 1px var(--ge-accent);
+}
+
+.ge-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 0 8px 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.ge-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.ge-tab {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 26px;
+  padding: 0;
+  background: none;
+  border: 0;
+  border-radius: 4px;
+  color: var(--ge-muted);
+  font-family: var(--ge-font-emoji);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.7;
+}
+
+.ge-tab img {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.ge-tab:hover {
+  background: var(--ge-hover);
+  opacity: 1;
+}
+
+.ge-tab[data-active] {
+  background: var(--ge-hover);
+  box-shadow: inset 0 -2px 0 var(--ge-accent);
+  opacity: 1;
+}
+
+.ge-list {
+  position: relative;
+  height: var(--ge-list-height);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-top: 1px solid var(--ge-border);
+}
+
+.ge-sizer {
+  position: relative;
+  width: 100%;
+}
+
+.ge-window {
+  position: absolute;
+  inset: 0 0 auto;
+  will-change: transform;
+}
+
+.ge-row {
+  display: grid;
+  grid-template-columns: repeat(var(--ge-columns, 8), minmax(0, 1fr));
+  gap: var(--ge-gap, 2px);
+  height: var(--ge-row-height, 36px);
+  padding: 0 8px;
+}
+
+.ge-header {
+  display: flex;
+  align-items: center;
+  height: var(--ge-header-height, 26px);
+  padding: 0 8px;
+  color: var(--ge-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.ge-cell {
+  display: grid;
+  place-items: center;
+  height: var(--ge-cell, 34px);
+  font-family: var(--ge-font-emoji);
+  font-size: 21px;
+  line-height: 1;
+  border-radius: 4px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.ge-cell img {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+}
+
+.ge-cell:hover {
+  background: var(--ge-hover);
+}
+
+.ge-cell[data-active] {
+  background: var(--ge-active);
+}
+
+.ge-sticky {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  height: var(--ge-header-height, 26px);
+  padding: 0 8px;
+  background: var(--ge-bg);
+  color: var(--ge-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+
+.ge-empty {
+  margin: 0;
+  padding: 24px 12px;
+  color: var(--ge-muted);
+  font-size: 13px;
+  text-align: center;
+}

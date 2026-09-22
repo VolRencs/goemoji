@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>goemoji — песочница</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 24px;
+        background: #313338;
+        color: #dbdee1;
+        font-family: system-ui, sans-serif;
+      }
+      .wrap {
+        display: flex;
+        gap: 24px;
+        align-items: flex-start;
+        flex-wrap: wrap;
+      }
+      .panel {
+        width: 340px;
+      }
+      .controls {
+        display: grid;
+        gap: 8px;
+        width: 260px;
+        font-size: 13px;
+      }
+      label {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+      code {
+        color: #b5bac1;
+      }
+      .ge-list {
+        --ge-list-height: 340px;
+      }
+      /* в песочнице id серверных эмодзи фейковые: рисуем заглушку */
+      .ge-cell img {
+        background: rgba(255, 255, 255, 0.08);
+        border-radius: 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="./main.tsx"></script>
+  </body>
+</html>
