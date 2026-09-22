@@ -159,6 +159,14 @@ export function EmojiPicker({
 
     const nextSections: Section[] = [];
     const nextTabs: TabMeta[] = [];
+    if (serverEntries.length) {
+      nextSections.push({ label: labels.server, emojis: serverEntries });
+      nextTabs.push({
+        icon: SERVER_TAB_ICON,
+        title: labels.server,
+        ...(serverIconUrl ? { img: serverIconUrl } : {}),
+      });
+    }
     if (recentEmojis.length) {
       nextSections.push({ label: labels.recent, emojis: recentEmojis });
       nextTabs.push({ icon: RECENT_TAB_ICON, title: labels.recent });
@@ -169,14 +177,6 @@ export function EmojiPicker({
       nextSections.push({ label: category.label, emojis: list });
       nextTabs.push({ icon: categoryIcon(category.key), title: category.label });
     });
-    if (serverEntries.length) {
-      nextSections.push({ label: labels.server, emojis: serverEntries });
-      nextTabs.push({
-        icon: SERVER_TAB_ICON,
-        title: labels.server,
-        ...(serverIconUrl ? { img: serverIconUrl } : {}),
-      });
-    }
     return { sections: nextSections, tabs: nextTabs };
   }, [query, merged, recentEmojis, data.categories, data.emojis, serverEntries, labels, serverIconUrl]);
 

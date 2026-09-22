@@ -44,6 +44,11 @@ for (const fragment of [
   assert.ok(tinyHtml.includes(fragment), `в разметке нет «${fragment}»`);
 }
 
+assert.ok(
+  tinyHtml.indexOf("Сервер") < tinyHtml.indexOf("Смайлики"),
+  "секция и вкладка «Сервер» должны идти перед юникод-категориями",
+);
+
 // Полный ru-словарь: проверяем, что рендер большого списка не падает.
 const data = parseEmojiData(JSON.parse(readFileSync("data/ru.json", "utf8")));
 const html = renderToStaticMarkup(

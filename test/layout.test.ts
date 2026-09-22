@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import {
   buildLayout,
@@ -8,11 +9,13 @@ import {
   flatIndexAt,
   lastCell,
   moveActive,
+  parseEmojiData,
   scrollToShowRow,
   sectionAt,
   sectionOffset,
   visibleRange,
   type Emoji,
+  type Layout,
   type Section,
 } from "../src/data.ts";
 
@@ -136,5 +139,37 @@ describe("scrollToShowRow", () => {
 
   it("не двигает скролл, если строка уже видна", () => {
     assert.equal(scrollToShowRow(layout, 4, 28, 10), 28);
+  });
+});
+
+function collect(layout: Layout, start: number, end: number, seen: Set<number>): void {
+  for (let row = start; row < end; row++) {
+    const layoutRow = layout.rows[row]!;
+    if (layoutRow.kind !== "emojis") continue;
+    for (let col = 0; col < layoutRow.emojis.length; col++) seen.add(layoutRow.start + col);
+  }
+}
+
+describe("полный словарь ru", () => {
+  it("окно виртуализации показывает все эмодзи без пропусков", () => {
+    const data = parseEmojiData(JSON.parse(readFileSync("data/ru.json", "utf8")));
+    const sections: Section[] = data.categories.map((category, index) => ({
+      label: category.label,
+      emojis: data.emojis.filter((emoji) => emoji.category === index),
+    }));
+    const full = buildLayout(sections, 8, 36, HEADER);
+    const viewport = 262;
+    const maxScroll = Math.max(0, full.totalHeight - viewport);
+    const seen = new Set<number>();
+
+    for (let scrollTop = 0; scrollTop <= maxScroll; scrollTop += 37) {
+      const [start, end] = visibleRange(full, scrollTop, viewport);
+      assert.ok(end > start, `пустое окно при scrollTop=${scrollTop}`);
+      collect(full, start, end, seen);
+    }
+    const [lastStart, lastEnd] = visibleRange(full, maxScroll, viewport);
+    collect(full, lastStart, lastEnd, seen);
+
+    assert.equal(seen.size, data.emojis.length, "часть эмодзи недостижима скроллом");
   });
 });
