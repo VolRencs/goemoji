@@ -3,7 +3,6 @@ import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import {
   buildLayout,
-  cellFromFlatIndex,
   emojiAt,
   firstCell,
   flatIndexAt,
@@ -88,15 +87,19 @@ describe("секции", () => {
     assert.equal(sectionOffset(layout, 0), 0);
     assert.equal(sectionOffset(layout, 1), 24);
   });
+
+  it("у нижней границы списка подсвечивает последнюю секцию", () => {
+    const maxScroll = layout.totalHeight - 10;
+    assert.equal(sectionAt(layout, maxScroll, maxScroll), 1);
+    assert.equal(sectionAt(layout, 20, maxScroll), 0);
+    assert.equal(sectionAt(layout, 20), 0);
+  });
 });
 
 describe("ячейки", () => {
-  it("переводит ячейку в плоский индекс и обратно", () => {
+  it("переводит ячейку в плоский индекс", () => {
     assert.equal(flatIndexAt(layout, { row: 1, col: 1 }), 1);
     assert.equal(flatIndexAt(layout, { row: 0, col: 0 }), -1);
-    assert.deepEqual(cellFromFlatIndex(layout, 2), { row: 2, col: 0 });
-    assert.deepEqual(cellFromFlatIndex(layout, 4), { row: 4, col: 1 });
-    assert.equal(cellFromFlatIndex(layout, 99), null);
   });
 
   it("возвращает эмодзи и null для заголовка", () => {

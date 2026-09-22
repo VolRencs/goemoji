@@ -16,6 +16,8 @@ type EmojiListProps = {
   stickyLabel: string | null;
   scrollRef: RefObject<HTMLDivElement | null>;
   onScroll: () => void;
+  /** Ручной скролл/клик — прерывает анимацию перехода по вкладке. */
+  onInterrupt: () => void;
   onSelect: (emoji: Emoji) => void;
   onHover: (cell: Cell) => void;
   onLeave: () => void;
@@ -33,6 +35,7 @@ export function EmojiList({
   stickyLabel,
   scrollRef,
   onScroll,
+  onInterrupt,
   onSelect,
   onHover,
   onLeave,
@@ -48,6 +51,9 @@ export function EmojiList({
       role="listbox"
       aria-label={label}
       onScroll={onScroll}
+      onWheel={onInterrupt}
+      onTouchStart={onInterrupt}
+      onPointerDown={onInterrupt}
       onMouseLeave={onLeave}
     >
       <div className="ge-sizer" style={{ height: layout.totalHeight }}>

@@ -10,6 +10,8 @@ take part in search.
 - **Own rendering**: unicode via the system emoji font, custom emoji as images.
 - **No CSS hacks**: one theme driven by CSS variables, no `!important` fights.
 - **Accessible**: `combobox` + `listbox`, `aria-activedescendant`, arrow/Home/End/Enter/Esc.
+- **Fast scrolling**: the virtualization window is recomputed inside rAF and React only
+  re-renders when the window actually moves; tabs switch instantly.
 
 See `README.ru.md` for the Russian version.
 

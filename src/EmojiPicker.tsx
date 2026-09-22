@@ -28,6 +28,7 @@ import {
   type Cell,
   type Emoji,
   type EmojiData,
+  type Layout,
   type Section,
   type ServerEmoji,
   type SkinTone,
@@ -50,6 +51,74 @@ const DEFAULT_CELL_SIZE = 34;
 const HEADER_HEIGHT = 26;
 const MAX_RECENT = 24;
 const PAGE_ROWS = 5;
+/** Запас строк за границей окна: реже меняется окно — меньше перерисовок при скролле. */
+const OVERSCAN = 3;
+
+type ViewState = {
+  /** Первая и последняя (не включая) видимые строки. */
+  start: number;
+  end: number;
+  /** Активная секция (вкладка); -1 при поиске или пустом списке. */
+  section: number;
+  /** Липкий заголовок секции, если её шапка уехала вверх. */
+  sticky: string | null;
+};
+
+type ViewInput = {
+  layout: Layout;
+  sections: readonly Section[];
+  searching: boolean;
+  scrollTop: number;
+  viewportHeight: number;
+  maxScroll: number;
+  /** Секция, выбранная вкладкой: подсвечивается сразу, не дожидаясь скролла. */
+  pinned: number | null;
+};
+
+/** Считает окно виртуализации, активную секцию и липкий заголовок.
+ *  Чистая функция — вызывается и в первом рендере (SSR), и из rAF на скролле. */
+function computeView({
+  layout,
+  sections,
+  searching,
+  scrollTop,
+  viewportHeight,
+  maxScroll,
+  pinned,
+}: ViewInput): ViewState {
+  const [start, end] = visibleRange(layout, scrollTop, viewportHeight, OVERSCAN);
+  const section = pinned ?? (searching ? -1 : sectionAt(layout, scrollTop, maxScroll));
+  const headerRow = section >= 0 ? layout.sectionRows[section] : undefined;
+  const sticky =
+    !searching &&
+    headerRow !== undefined &&
+    headerRow >= 0 &&
+    (layout.offsets[headerRow] ?? 0) + layout.headerHeight <= scrollTop + 1
+      ? (sections[section]?.label ?? null)
+      : null;
+  return { start, end, section, sticky };
+}
+
+/** Плавный доезд до позиции: короткая анимация вместо нативного smooth,
+ *  у которого длительность зависит от расстояния. Возвращает отмену. */
+function glideTo(element: HTMLElement, to: number, onFrame: () => void): () => void {
+  const from = element.scrollTop;
+  const distance = to - from;
+  const duration = Math.min(260, 90 + Math.abs(distance) * 0.25);
+  const start = performance.now();
+  let frame = 0;
+
+  const step = (now: number): void => {
+    const progress = Math.min(1, (now - start) / duration);
+    const eased = 1 - (1 - progress) ** 3;
+    element.scrollTop = from + distance * eased;
+    onFrame();
+    if (progress < 1) frame = requestAnimationFrame(step);
+  };
+
+  frame = requestAnimationFrame(step);
+  return () => cancelAnimationFrame(frame);
+}
 
 type TabMeta = { icon: string; title: string; img?: string | undefined };
 
@@ -100,8 +169,9 @@ export function EmojiPicker({
 
   const [query, setQuery] = useState("");
   const [active, setActive] = useState<Cell | null>(null);
-  const [scrollTop, setScrollTop] = useState(0);
   const [viewportHeight, setViewportHeight] = useState(320);
+  const pinnedRef = useRef<number | null>(null);
+  const glideRef = useRef<(() => void) | null>(null);
   const [toneOpen, setToneOpen] = useState(false);
   const [recent, setRecent] = useState<string[]>(() =>
     recentKey === false ? [] : readRecent(recentKey),
@@ -114,6 +184,11 @@ export function EmojiPicker({
   const rootRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const frameRef = useRef<number | null>(null);
+
+  /** «Пин» вкладки: подсветка переключается сразу, список доезжает анимацией. */
+  const pinSection = useCallback((index: number | null) => {
+    pinnedRef.current = index;
+  }, []);
 
   const serverEntries = useMemo(
     () => (serverEmojis ?? []).map(serverEmojiToEmoji),
@@ -185,31 +260,71 @@ export function EmojiPicker({
     () => buildLayout(sections, columns, rowHeight, HEADER_HEIGHT),
     [sections, columns, rowHeight],
   );
-  const [start, end] = visibleRange(layout, scrollTop, viewportHeight);
 
   const searching = query.trim().length > 0;
-  const activeSection = searching ? -1 : sectionAt(layout, scrollTop);
-  const stickyLabel = useMemo(() => {
-    if (activeSection < 0) return null;
-    const row = layout.sectionRows[activeSection];
-    const label = sections[activeSection]?.label;
-    if (row === undefined || row < 0 || label === undefined) return null;
-    return (layout.offsets[row] ?? 0) + layout.headerHeight <= scrollTop + 1 ? label : null;
-  }, [activeSection, layout, sections, scrollTop]);
+
+  // Первое окно считаем сразу в рендере: иначе в SSR-разметке не будет строк.
+  const [view, setView] = useState<ViewState>(() =>
+    computeView({ layout, sections, searching, scrollTop: 0, viewportHeight, maxScroll: 0, pinned: null }),
+  );
+
+  /**
+   * Обновляет окно после скролла. Если ничего не изменилось, состояние
+   * возвращается тем же объектом и React пропускает перерисовку.
+   */
+  const syncView = useCallback(() => {
+    const element = scrollRef.current;
+    const scrollTop = element?.scrollTop ?? 0;
+    const maxScroll = element ? Math.max(0, element.scrollHeight - element.clientHeight) : 0;
+    const current = pinnedRef.current;
+
+    // Доехали до секции, выбранной вкладкой (или упёрлись в низ) — снимаем «пин».
+    let active = current;
+    if (active !== null) {
+      const target = sectionOffset(layout, active);
+      if (Math.abs(scrollTop - target) <= 1 || scrollTop >= maxScroll - 1) {
+        pinSection(null);
+        active = null;
+      }
+    }
+
+    const next = computeView({
+      layout,
+      sections,
+      searching,
+      scrollTop,
+      viewportHeight,
+      maxScroll,
+      pinned: active,
+    });
+    setView((previous) =>
+      previous.start === next.start &&
+      previous.end === next.end &&
+      previous.section === next.section &&
+      previous.sticky === next.sticky
+        ? previous
+        : next,
+    );
+  }, [layout, pinSection, searching, sections, viewportHeight]);
 
   const activeId = active ? `${listId}-${flatIndexAt(layout, active)}` : null;
 
-  const updateScroll = useCallback(() => {
+  const onScroll = useCallback(() => {
     if (frameRef.current !== null) return;
     frameRef.current = requestAnimationFrame(() => {
       frameRef.current = null;
-      setScrollTop(scrollRef.current?.scrollTop ?? 0);
+      syncView();
     });
-  }, []);
+  }, [syncView]);
 
   useEffect(() => () => {
     if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
+    glideRef.current?.();
   }, []);
+
+  useEffect(() => {
+    syncView();
+  }, [syncView]);
 
   useEffect(() => {
     const element = scrollRef.current;
@@ -230,10 +345,35 @@ export function EmojiPicker({
     return () => document.removeEventListener("pointerdown", onPointerDown);
   }, [toneOpen]);
 
-  const scrollTo = useCallback((top: number, smooth = false) => {
-    scrollRef.current?.scrollTo({ top, behavior: smooth ? "smooth" : "auto" });
-    setScrollTop(top);
-  }, []);
+  /** Мгновенный переход без анимации: поиск и клавиатура. */
+  const jumpTo = useCallback(
+    (top: number) => {
+      const element = scrollRef.current;
+      if (element) element.scrollTop = top;
+      syncView();
+    },
+    [syncView],
+  );
+
+  /** Клик по вкладке: подсветка сразу, список доезжает короткой анимацией. */
+  const selectSection = useCallback(
+    (index: number) => {
+      pinSection(index);
+      syncView();
+      glideRef.current?.();
+      glideRef.current = null;
+      const element = scrollRef.current;
+      if (element) glideRef.current = glideTo(element, sectionOffset(layout, index), syncView);
+    },
+    [layout, pinSection, syncView],
+  );
+
+  /** Ручной скролл или клавиатура прерывают анимацию и снимают «пин». */
+  const stopGlide = useCallback(() => {
+    glideRef.current?.();
+    glideRef.current = null;
+    pinSection(null);
+  }, [pinSection]);
 
   const select = useCallback(
     (emoji: Emoji) => {
@@ -253,11 +393,12 @@ export function EmojiPicker({
 
   const changeQuery = useCallback(
     (value: string) => {
+      pinSection(null);
       setQuery(value);
       setActive(null);
-      scrollTo(0);
+      jumpTo(0);
     },
-    [scrollTo],
+    [jumpTo, pinSection],
   );
 
   const changeTone = useCallback(
@@ -318,10 +459,11 @@ export function EmojiPicker({
     }
 
     event.preventDefault();
+    stopGlide();
     setActive(next);
     const from = scrollRef.current?.scrollTop ?? 0;
     const top = scrollToShowRow(layout, next.row, from, viewportHeight, layout.headerHeight);
-    if (Math.abs(top - from) > 1) scrollTo(top);
+    if (Math.abs(top - from) > 1) jumpTo(top);
   };
 
   return (
@@ -405,11 +547,11 @@ export function EmojiPicker({
               key={`${tab.title}-${index}`}
               type="button"
               role="tab"
-              aria-selected={index === activeSection}
+              aria-selected={index === view.section}
               className="ge-tab"
-              data-active={index === activeSection ? "" : undefined}
+              data-active={index === view.section ? "" : undefined}
               title={tab.title}
-              onClick={() => scrollTo(sectionOffset(layout, index), true)}
+              onClick={() => selectSection(index)}
             >
               {tab.img ? <img src={tab.img} alt="" draggable={false} /> : tab.icon}
             </button>
@@ -419,16 +561,17 @@ export function EmojiPicker({
 
       <EmojiList
         layout={layout}
-        start={start}
-        end={end}
+        start={view.start}
+        end={view.end}
         active={active}
         tone={tone}
         listId={listId}
         label={labels.search}
         emptyLabel={labels.empty}
-        stickyLabel={stickyLabel}
+        stickyLabel={view.sticky}
         scrollRef={scrollRef}
-        onScroll={updateScroll}
+        onScroll={onScroll}
+        onInterrupt={stopGlide}
         onSelect={select}
         onHover={setActive}
         onLeave={() => setActive(null)}

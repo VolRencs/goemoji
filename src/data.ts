@@ -303,8 +303,21 @@ export function visibleRange(
   return [start, end];
 }
 
-/** Индекс секции, которая сейчас вверху списка (`-1`, если список пуст). */
-export function sectionAt(layout: Layout, scrollTop: number): number {
+/** Индекс секции, которая сейчас вверху списка (`-1`, если список пуст).
+ *  У нижней границы (когда `scrollTop` упёрся в конец) подсвечивается
+ *  последняя непустая секция — иначе короткая секция в конце списка
+ *  никогда не стала бы активной. */
+export function sectionAt(
+  layout: Layout,
+  scrollTop: number,
+  maxScroll = Number.POSITIVE_INFINITY,
+): number {
+  if (scrollTop >= maxScroll - 1 && maxScroll > 0) {
+    for (let index = layout.sectionRows.length - 1; index >= 0; index--) {
+      if ((layout.sectionRows[index] ?? -1) >= 0) return index;
+    }
+  }
+
   let current = -1;
   for (let index = 0; index < layout.sectionRows.length; index++) {
     const row = layout.sectionRows[index]!;
@@ -327,17 +340,6 @@ export type Cell = { row: number; col: number };
 export function flatIndexAt(layout: Layout, cell: Cell): number {
   const row = layout.rows[cell.row];
   return row?.kind === "emojis" ? row.start + cell.col : -1;
-}
-
-export function cellFromFlatIndex(layout: Layout, flatIndex: number): Cell | null {
-  for (let row = 0; row < layout.rows.length; row++) {
-    const layoutRow = layout.rows[row]!;
-    if (layoutRow.kind !== "emojis") continue;
-    if (flatIndex >= layoutRow.start && flatIndex < layoutRow.start + layoutRow.emojis.length) {
-      return { row, col: flatIndex - layoutRow.start };
-    }
-  }
-  return null;
 }
 
 function clampCol(layout: Layout, row: number, col: number): number {

@@ -11,6 +11,8 @@
   селекторов поверх чужих inline-стилей.
 - **Доступность**: `combobox` + `listbox`, `aria-activedescendant`, стрелки/Home/End/
   Enter/Esc, подписи из данных.
+- **Быстрый скролл**: окно виртуализации пересчитывается в rAF, React перерисовывает
+  список только когда окно реально сдвинулось; вкладки переключаются мгновенно.
 
 ## Установка
 
@@ -88,11 +90,16 @@ React-free помощники — можно импортировать в Node 
 import { parseCustomEmoji, customEmojiToString, customEmojiUrl, sameEmojiValue } from "goemoji/discord";
 ```
 
-### Утилиты
+### Экспорты
 
-`parseEmojiData`, `searchEmojis`, `serverEmojiToEmoji`, `skinToneVariation`,
-`stripSkinTone`, `supportsSkinTone`, `buildLayout`, `visibleRange`, `moveActive`,
-`SKIN_TONES`, `SERVER_CATEGORY` — всё чистое и покрыто тестами.
+- `EmojiPicker` — компонент (пропы выше).
+- `useEmojiData` — ленивая загрузка и разбор словаря.
+- `parseEmojiData` — разбор словаря при статическом импорте.
+- Типы: `EmojiData`, `Emoji`, `Category`, `ServerEmoji`, `SkinTone`, `SlimEmoji`, `Labels`, `EmojiPickerProps`.
+- `goemoji/discord` — помощники без React, можно импортировать в Node (бот, API-роуты).
+
+Внутренности (виртуализация, поиск, тона кожи) наружу не выставлены — они покрыты
+тестами в `test/` и живут в одном модуле с компонентом.
 
 ## Данные
 

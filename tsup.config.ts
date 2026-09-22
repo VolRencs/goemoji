@@ -8,7 +8,7 @@ export default defineConfig({
   },
   format: ["esm"],
   target: "es2022",
-  dts: true,
+  dts: { entry: { index: "src/index.ts", discord: "src/discord.ts" } },
   minify: true,
   sourcemap: true,
   clean: true,
