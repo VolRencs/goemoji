@@ -1,14 +1,11 @@
-/**
- * Бюджет размера: падаем, если бандл или данные распухли.
- * Запуск: `pnpm size` (после `pnpm build`).
- */
 import { readFileSync, readdirSync } from "node:fs";
 import { gzipSync } from "node:zlib";
 
-/** Бандл — это `dist/index.js` вместе с его чанками. */
 function bundleBytes(entry: string): { bytes: Buffer; files: string[] } {
   const directory = entry.slice(0, entry.lastIndexOf("/"));
-  const chunks = readdirSync(directory).filter((name) => name.startsWith("chunk-") && name.endsWith(".js"));
+  const chunks = readdirSync(directory).filter(
+    (name) => name.endsWith(".js") && (name.startsWith("chunk-") || name === "discord.js"),
+  );
   const files = [entry, ...chunks.map((name) => `${directory}/${name}`)];
   return { bytes: Buffer.concat(files.map((file) => readFileSync(file))), files };
 }

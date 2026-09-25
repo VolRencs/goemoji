@@ -2,15 +2,19 @@
   "compilerOptions": {
     "target": "es2022",
     "lib": ["dom", "dom.iterable", "esnext"],
-    "module": "esnext",
-    "moduleResolution": "bundler",
+    "module": "preserve",
+    "moduleDetection": "force",
     "jsx": "react-jsx",
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
+    "noImplicitReturns": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
     "verbatimModuleSyntax": true,
+    "isolatedModules": true,
     "erasableSyntaxOnly": true,
     "noUncheckedSideEffectImports": true,
     "allowImportingTsExtensions": true,
@@ -19,5 +23,5 @@
     "noEmit": true,
     "types": ["node"]
   },
-  "include": ["src", "test", "scripts", "demo", "tsup.config.ts"]
+  "include": ["src", "test", "scripts", "demo", "tsdown.config.ts"]
 }

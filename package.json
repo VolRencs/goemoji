@@ -1,6 +1,6 @@
 {
   "name": "goemoji",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Лёгкий эмодзи-пикер для React: вкладки категорий, поиск, скины и серверные эмодзи Discord.",
   "license": "MIT",
   "author": "VolRencs",
@@ -8,10 +8,13 @@
   "sideEffects": [
     "./dist/styles.css"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "engines": {
     "node": ">=24"
   },
-  "packageManager": "pnpm@12.5.1",
+  "packageManager": "pnpm@12.6.0",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/VolRencs/goemoji.git"
@@ -33,46 +36,55 @@
     "data",
     "README.md",
     "README.ru.md",
+    "CHANGELOG.md",
     "LICENSE",
     "THIRD_PARTY_NOTICES.md"
   ],
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
     },
     "./discord": {
       "types": "./dist/discord.d.ts",
-      "import": "./dist/discord.js"
+      "import": "./dist/discord.js",
+      "default": "./dist/discord.js"
     },
-    "./styles.css": "./dist/styles.css",
+    "./styles.css": {
+      "default": "./dist/styles.css"
+    },
     "./data/ru.json": "./data/ru.json",
     "./data/en.json": "./data/en.json",
     "./package.json": "./package.json"
   },
   "scripts": {
-    "build": "tsup",
+    "build": "tsdown",
     "check": "tsc --noEmit",
     "test": "node --test test/*.test.ts",
     "data": "node scripts/build-data.ts",
     "size": "node scripts/size-budget.ts",
     "smoke": "node scripts/smoke.ts",
+    "lint:package": "LINT_PACKAGE=1 tsdown",
     "dev": "vite --config demo/vite.config.ts",
-    "prepare": "tsup",
-    "prepublishOnly": "pnpm check && pnpm test && pnpm build && pnpm size && pnpm smoke"
+    "prepare": "tsdown",
+    "prepublishOnly": "pnpm lint:package && pnpm check && pnpm test && pnpm build && pnpm size && pnpm smoke"
   },
   "peerDependencies": {
     "react": "^19"
   },
   "devDependencies": {
-    "@types/node": "^26.6.1",
+    "@arethetypeswrong/core": "^0.18.5",
+    "@tsdown/css": "^0.23.0",
+    "@types/node": "^26.6.2",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "emojibase-data": "^17.0.0",
+    "publint": "^0.3.24",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
-    "tsup": "^8.5.0",
-    "typescript": "^5.9.0",
-    "vite": "^7.0.0"
+    "tsdown": "^0.23.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.1"
   }
 }
