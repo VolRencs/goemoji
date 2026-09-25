@@ -51,16 +51,12 @@ const DEFAULT_CELL_SIZE = 34;
 const HEADER_HEIGHT = 26;
 const MAX_RECENT = 24;
 const PAGE_ROWS = 5;
-/** Запас строк за границей окна: реже меняется окно — меньше перерисовок при скролле. */
 const OVERSCAN = 3;
 
 type ViewState = {
-  /** Первая и последняя (не включая) видимые строки. */
   start: number;
   end: number;
-  /** Активная секция (вкладка); -1 при поиске или пустом списке. */
   section: number;
-  /** Липкий заголовок секции, если её шапка уехала вверх. */
   sticky: string | null;
 };
 
@@ -71,12 +67,9 @@ type ViewInput = {
   scrollTop: number;
   viewportHeight: number;
   maxScroll: number;
-  /** Секция, выбранная вкладкой: подсвечивается сразу, не дожидаясь скролла. */
   pinned: number | null;
 };
 
-/** Считает окно виртуализации, активную секцию и липкий заголовок.
- *  Чистая функция — вызывается и в первом рендере (SSR), и из rAF на скролле. */
 function computeView({
   layout,
   sections,
@@ -99,9 +92,17 @@ function computeView({
   return { start, end, section, sticky };
 }
 
-/** Плавный доезд до позиции: короткая анимация вместо нативного smooth,
- *  у которого длительность зависит от расстояния. Возвращает отмену. */
 function glideTo(element: HTMLElement, to: number, onFrame: () => void): () => void {
+  const reduceMotion =
+    typeof window !== "undefined" &&
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (reduceMotion) {
+    element.scrollTop = to;
+    onFrame();
+    return () => {};
+  }
+
   const from = element.scrollTop;
   const distance = to - from;
   const duration = Math.min(260, 90 + Math.abs(distance) * 0.25);
@@ -123,26 +124,17 @@ function glideTo(element: HTMLElement, to: number, onFrame: () => void): () => v
 type TabMeta = { icon: string; title: string; img?: string | undefined };
 
 export type EmojiPickerProps = {
-  /** Разобранный словарь: `parseEmojiData(ruJson)` или `useEmojiData(...)`. */
   data: EmojiData;
-  /** Серверные эмодзи гильдии — вкладка «Сервер» и участие в поиске. */
   serverEmojis?: readonly ServerEmoji[] | undefined;
-  /** Колонок в сетке. */
   columns?: number | undefined;
-  /** Сторона ячейки в пикселях. */
   cellSize?: number | undefined;
-  /** Локаль UI (`ru`/`en`), по умолчанию `ru`. */
   locale?: string | undefined;
-  /** Переопределение отдельных строк UI. */
   labels?: Partial<Labels> | undefined;
-  /** Контролируемый тон кожи; без него храним последний в localStorage. */
   skinTone?: SkinTone | undefined;
   onSkinToneChange?: ((tone: SkinTone) => void) | undefined;
-  /** Ключ localStorage для недавних; `false` — отключить. */
   recentKey?: string | false | undefined;
   onSelect: (emoji: Emoji) => void;
   onEscape?: (() => void) | undefined;
-  /** Иконка сервера для вкладки «Сервер». */
   serverIconUrl?: string | undefined;
   className?: string | undefined;
 };
@@ -162,6 +154,11 @@ export function EmojiPicker({
   serverIconUrl,
   className,
 }: EmojiPickerProps) {
+  const gridColumns = Number.isFinite(columns) ? Math.max(1, Math.trunc(columns)) : DEFAULT_COLUMNS;
+  const gridCellSize = Number.isFinite(cellSize)
+    ? Math.max(1, Math.trunc(cellSize))
+    : DEFAULT_CELL_SIZE;
+
   const labels = useMemo<Labels>(
     () => ({ ...labelsFor(locale), ...labelOverrides }),
     [locale, labelOverrides],
@@ -179,13 +176,19 @@ export function EmojiPicker({
   const [internalTone, setInternalTone] = useState<SkinTone>(readTone);
   const tone = skinTone ?? internalTone;
 
+  useEffect(() => {
+    setRecent(recentKey === false ? [] : readRecent(recentKey));
+  }, [recentKey]);
+
   const generatedId = useId().replace(/[^\w-]/g, "");
   const listId = `ge-list-${generatedId}`;
   const rootRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const frameRef = useRef<number | null>(null);
+  const toneButtonRef = useRef<HTMLButtonElement>(null);
+  const tonePopRef = useRef<HTMLDivElement>(null);
+  const toneFocusRef = useRef<"first" | "last" | null>(null);
 
-  /** «Пин» вкладки: подсветка переключается сразу, список доезжает анимацией. */
   const pinSection = useCallback((index: number | null) => {
     pinnedRef.current = index;
   }, []);
@@ -255,30 +258,24 @@ export function EmojiPicker({
     return { sections: nextSections, tabs: nextTabs };
   }, [query, merged, recentEmojis, data.categories, data.emojis, serverEntries, labels, serverIconUrl]);
 
-  const rowHeight = cellSize + GRID_GAP;
+  const rowHeight = gridCellSize + GRID_GAP;
   const layout = useMemo(
-    () => buildLayout(sections, columns, rowHeight, HEADER_HEIGHT),
-    [sections, columns, rowHeight],
+    () => buildLayout(sections, gridColumns, rowHeight, HEADER_HEIGHT),
+    [sections, gridColumns, rowHeight],
   );
 
   const searching = query.trim().length > 0;
 
-  // Первое окно считаем сразу в рендере: иначе в SSR-разметке не будет строк.
   const [view, setView] = useState<ViewState>(() =>
     computeView({ layout, sections, searching, scrollTop: 0, viewportHeight, maxScroll: 0, pinned: null }),
   );
 
-  /**
-   * Обновляет окно после скролла. Если ничего не изменилось, состояние
-   * возвращается тем же объектом и React пропускает перерисовку.
-   */
   const syncView = useCallback(() => {
     const element = scrollRef.current;
     const scrollTop = element?.scrollTop ?? 0;
     const maxScroll = element ? Math.max(0, element.scrollHeight - element.clientHeight) : 0;
     const current = pinnedRef.current;
 
-    // Доехали до секции, выбранной вкладкой (или упёрлись в низ) — снимаем «пин».
     let active = current;
     if (active !== null) {
       const target = sectionOffset(layout, active);
@@ -307,7 +304,8 @@ export function EmojiPicker({
     );
   }, [layout, pinSection, searching, sections, viewportHeight]);
 
-  const activeId = active ? `${listId}-${flatIndexAt(layout, active)}` : null;
+  const activeFlat = active ? flatIndexAt(layout, active) : -1;
+  const activeId = activeFlat >= 0 ? `${listId}-${activeFlat}` : null;
 
   const onScroll = useCallback(() => {
     if (frameRef.current !== null) return;
@@ -327,6 +325,10 @@ export function EmojiPicker({
   }, [syncView]);
 
   useEffect(() => {
+    setActive(null);
+  }, [layout]);
+
+  useEffect(() => {
     const element = scrollRef.current;
     if (!element) return;
     const measure = () => setViewportHeight(element.clientHeight);
@@ -335,6 +337,24 @@ export function EmojiPicker({
     observer.observe(element);
     return () => observer.disconnect();
   }, []);
+
+  const closeTone = useCallback((restoreFocus = true) => {
+    setToneOpen(false);
+    if (restoreFocus) toneButtonRef.current?.focus();
+  }, []);
+
+  const focusToneItem = useCallback((index: number) => {
+    const items = tonePopRef.current?.querySelectorAll<HTMLButtonElement>("[role=menuitemradio]");
+    if (!items?.length) return;
+    items[(index + items.length) % items.length]?.focus();
+  }, []);
+
+  useEffect(() => {
+    if (toneOpen && toneFocusRef.current !== null) {
+      focusToneItem(toneFocusRef.current === "first" ? 0 : -1);
+      toneFocusRef.current = null;
+    }
+  }, [toneOpen, focusToneItem]);
 
   useEffect(() => {
     if (!toneOpen) return;
@@ -345,7 +365,57 @@ export function EmojiPicker({
     return () => document.removeEventListener("pointerdown", onPointerDown);
   }, [toneOpen]);
 
-  /** Мгновенный переход без анимации: поиск и клавиатура. */
+  const onToneKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    const items = Array.from(
+      tonePopRef.current?.querySelectorAll<HTMLButtonElement>("[role=menuitemradio]") ?? [],
+    );
+    const current = items.indexOf(document.activeElement as HTMLButtonElement);
+    switch (event.key) {
+      case "ArrowDown":
+      case "ArrowRight":
+        event.preventDefault();
+        event.stopPropagation();
+        focusToneItem(current + 1);
+        break;
+      case "ArrowUp":
+      case "ArrowLeft":
+        event.preventDefault();
+        event.stopPropagation();
+        focusToneItem(current - 1);
+        break;
+      case "Home":
+        event.preventDefault();
+        event.stopPropagation();
+        focusToneItem(0);
+        break;
+      case "End":
+        event.preventDefault();
+        event.stopPropagation();
+        focusToneItem(items.length - 1);
+        break;
+      case "Escape":
+        event.preventDefault();
+        event.stopPropagation();
+        closeTone();
+        break;
+      default:
+        break;
+    }
+  };
+
+  const onToneButtonKeyDown = (event: ReactKeyboardEvent<HTMLButtonElement>) => {
+    if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+    event.preventDefault();
+    event.stopPropagation();
+    const target = event.key === "ArrowDown" ? 0 : -1;
+    if (toneOpen) {
+      focusToneItem(target);
+      return;
+    }
+    toneFocusRef.current = event.key === "ArrowDown" ? "first" : "last";
+    setToneOpen(true);
+  };
+
   const jumpTo = useCallback(
     (top: number) => {
       const element = scrollRef.current;
@@ -355,7 +425,6 @@ export function EmojiPicker({
     [syncView],
   );
 
-  /** Клик по вкладке: подсветка сразу, список доезжает короткой анимацией. */
   const selectSection = useCallback(
     (index: number) => {
       pinSection(index);
@@ -368,7 +437,6 @@ export function EmojiPicker({
     [layout, pinSection, syncView],
   );
 
-  /** Ручной скролл или клавиатура прерывают анимацию и снимают «пин». */
   const stopGlide = useCallback(() => {
     glideRef.current?.();
     glideRef.current = null;
@@ -404,6 +472,7 @@ export function EmojiPicker({
   const changeTone = useCallback(
     (next: SkinTone) => {
       setToneOpen(false);
+      toneButtonRef.current?.focus();
       if (skinTone === undefined) {
         setInternalTone(next);
         writeTone(next);
@@ -415,6 +484,11 @@ export function EmojiPicker({
 
   const onKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
     if (event.key === "Escape") {
+      if (toneOpen) {
+        event.preventDefault();
+        closeTone();
+        return;
+      }
       onEscape?.();
       return;
     }
@@ -472,11 +546,11 @@ export function EmojiPicker({
       className={className ? `ge-root ${className}` : "ge-root"}
       style={
         {
-          "--ge-cell": `${cellSize}px`,
+          "--ge-cell": `${gridCellSize}px`,
           "--ge-gap": `${GRID_GAP}px`,
           "--ge-row-height": `${rowHeight}px`,
           "--ge-header-height": `${HEADER_HEIGHT}px`,
-          "--ge-columns": columns,
+          "--ge-columns": gridColumns,
         } as CSSProperties
       }
       onKeyDown={onKeyDown}
@@ -497,19 +571,34 @@ export function EmojiPicker({
           autoFocus
           onChange={(event) => changeQuery(event.target.value)}
         />
-        <div className="ge-tone-wrap">
+        <div
+          className="ge-tone-wrap"
+          onBlur={(event) => {
+            const next = event.relatedTarget as Node | null;
+            if (next && !event.currentTarget.contains(next)) setToneOpen(false);
+          }}
+        >
           <button
+            ref={toneButtonRef}
             type="button"
             className="ge-tone"
             title={labels.skinTone}
             aria-label={labels.skinTone}
+            aria-haspopup="menu"
             aria-expanded={toneOpen}
             onClick={() => setToneOpen((open) => !open)}
+            onKeyDown={onToneButtonKeyDown}
           >
             {skinToneVariation(SKIN_TONE_BASE, tone)}
           </button>
           {toneOpen && (
-            <div className="ge-tone-pop" role="menu" aria-label={labels.skinTone}>
+            <div
+              ref={tonePopRef}
+              className="ge-tone-pop"
+              role="menu"
+              aria-label={labels.skinTone}
+              onKeyDown={onToneKeyDown}
+            >
               <button
                 type="button"
                 role="menuitemradio"
@@ -580,7 +669,17 @@ export function EmojiPicker({
   );
 }
 
+function hasStorage(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return typeof window.localStorage !== "undefined";
+  } catch {
+    return false;
+  }
+}
+
 function readRecent(key: string): string[] {
+  if (!hasStorage()) return [];
   try {
     const raw = localStorage.getItem(key);
     if (!raw) return [];
@@ -593,14 +692,15 @@ function readRecent(key: string): string[] {
 }
 
 function writeRecent(key: string, values: string[]): void {
+  if (!hasStorage()) return;
   try {
     localStorage.setItem(key, JSON.stringify(values));
   } catch {
-    /* хранилище недоступно или переполнено */
   }
 }
 
 function readTone(): SkinTone {
+  if (!hasStorage()) return "none";
   try {
     const raw = localStorage.getItem(TONE_STORAGE_KEY);
     return raw !== null && isSkinTone(raw) ? raw : "none";
@@ -610,10 +710,10 @@ function readTone(): SkinTone {
 }
 
 function writeTone(tone: SkinTone): void {
+  if (!hasStorage()) return;
   try {
     localStorage.setItem(TONE_STORAGE_KEY, tone);
   } catch {
-    /* хранилище недоступно */
   }
 }
 

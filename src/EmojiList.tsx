@@ -16,7 +16,6 @@ type EmojiListProps = {
   stickyLabel: string | null;
   scrollRef: RefObject<HTMLDivElement | null>;
   onScroll: () => void;
-  /** Ручной скролл/клик — прерывает анимацию перехода по вкладке. */
   onInterrupt: () => void;
   onSelect: (emoji: Emoji) => void;
   onHover: (cell: Cell) => void;

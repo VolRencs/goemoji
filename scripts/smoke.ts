@@ -1,7 +1,3 @@
-/**
- * Дымовой тест собранного пакета: рендерим пикер через react-dom/server и
- * проверяем разметку и экспорты `goemoji/discord`. Запуск: `pnpm smoke` (после `pnpm build`).
- */
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { createElement } from "react";
@@ -14,7 +10,6 @@ const serverEmojis = [
   { id: "43", name: "party_parrot", animated: false },
 ];
 
-// Небольшой словарь: серверная секция попадает в первое окно виртуализации.
 const tiny: EmojiData = {
   locale: "ru",
   categories: [{ key: "smileys-emotion", label: "Смайлики" }],
@@ -49,7 +44,6 @@ assert.ok(
   "секция и вкладка «Сервер» должны идти перед юникод-категориями",
 );
 
-// Полный ru-словарь: проверяем, что рендер большого списка не падает.
 const data = parseEmojiData(JSON.parse(readFileSync("data/ru.json", "utf8")));
 const html = renderToStaticMarkup(
   createElement(EmojiPicker, { data, serverEmojis, locale: "ru", onSelect: () => {} }),

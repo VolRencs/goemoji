@@ -1,17 +1,11 @@
 import type { SkinTone } from "./data.ts";
 
 export type Labels = {
-  /** Подсказка в поле поиска. */
   search: string;
-  /** Пустая выдача. */
   empty: string;
-  /** Заголовок секции недавних. */
   recent: string;
-  /** Заголовок секции серверных эмодзи. */
   server: string;
-  /** Подпись кнопки тона кожи. */
   skinTone: string;
-  /** Названия тонов. */
   skinTones: Record<Exclude<SkinTone, "none">, string>;
 };
 
@@ -61,18 +55,14 @@ const CATEGORY_ICONS: Record<string, string> = {
   flags: "🏳️",
 };
 
-/** Иконка вкладки категории (по ключу группы emojibase). */
 export function categoryIcon(key: string): string {
   return CATEGORY_ICONS[key] ?? "•";
 }
 
-/** Иконка вкладки серверных эмодзи, если потребитель не дал картинку сервера. */
 export const SERVER_TAB_ICON = "🧩";
 
 export const RECENT_TAB_ICON = "🕘";
 
-/** Шаг сетки между ячейками; JS и CSS берут его отсюда. */
 export const GRID_GAP = 2;
 
-/** Базовый эмодзи для кнопки тона кожи (Discord использует поднятую руку). */
 export const SKIN_TONE_BASE = "✋";

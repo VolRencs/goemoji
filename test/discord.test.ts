@@ -53,6 +53,22 @@ describe("customEmojiUrl", () => {
       "https://cdn.discordapp.com/emojis/42.gif?size=96",
     );
   });
+
+  it("клампит размер к диапазону Discord", () => {
+    assert.equal(customEmojiUrl("42", false, 0), "https://cdn.discordapp.com/emojis/42.png?size=16");
+    assert.equal(
+      customEmojiUrl("42", false, 99999),
+      "https://cdn.discordapp.com/emojis/42.png?size=4096",
+    );
+    assert.equal(
+      customEmojiUrl("42", false, Number.NaN),
+      "https://cdn.discordapp.com/emojis/42.png?size=48",
+    );
+    assert.equal(
+      customEmojiUrl("42", false, 48.7),
+      "https://cdn.discordapp.com/emojis/42.png?size=48",
+    );
+  });
 });
 
 describe("normalizeEmojiText", () => {
@@ -67,6 +83,11 @@ describe("sameEmojiValue", () => {
   it("сравнивает серверные эмодзи по id", () => {
     assert.equal(sameEmojiValue("<a:blob:777>", "blob", "blob:777"), true);
     assert.equal(sameEmojiValue("<a:blob:777>", "blob", "blob:888"), false);
+  });
+
+  it("не путает id с его суффиксом в identifier", () => {
+    assert.equal(sameEmojiValue("<:blob:777>", "blob", "blob:1777"), false);
+    assert.equal(sameEmojiValue("<:blob:777>", "blob", "blob:777"), true);
   });
 
   it("сравнивает юникод с точностью до селекторов", () => {

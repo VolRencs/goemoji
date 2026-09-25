@@ -1,10 +1,3 @@
-/**
- * Чистая логика пикера: разбор slim-словаря, поиск, тона кожи, раскладка
- * и виртуализация. Здесь нет React — всё покрыто тестами в `test/`.
- */
-
-/* ------------------------------------------------------------------ типы */
-
 export type SkinTone =
   | "none"
   | "light"
@@ -13,7 +6,6 @@ export type SkinTone =
   | "medium-dark"
   | "dark";
 
-/** Тона без `none`, от светлого к тёмному — совпадает с `tone` 1..5 в emojibase. */
 export const SKIN_TONES = [
   "light",
   "medium-light",
@@ -32,19 +24,15 @@ export const SKIN_TONE_MODIFIERS: Record<Exclude<SkinTone, "none">, string> = {
 
 export type Category = { key: string; label: string };
 
-/** Строка slim-словаря: `[эмодзи, название, теги через пробел, индекс категории]`. */
 export type SlimEmoji = [string, string, string, number];
 
 export type ServerEmoji = { id: string; name: string; animated: boolean };
 
 export type Emoji = {
-  /** Готовое значение: `"😀"` или `"<a:name:id>"`. */
   value: string;
   label: string;
-  /** Теги через пробел — только для поиска. */
   tags: string;
   category: number;
-  /** Заполнено у серверных эмодзи: рендерятся картинкой, а не глифом. */
   server?: { id: string; animated: boolean };
 };
 
@@ -56,13 +44,10 @@ export type EmojiData = {
 
 export const SERVER_CATEGORY = -1;
 
-/* --------------------------------------------------------------- разбор */
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
-/** Разворачивает namespace JSON-модуля (`{ default: … }`) — так его отдаёт `import("…/ru.json")`. */
 function unwrapDefault(raw: unknown): unknown {
   if (isRecord(raw) && raw.v === undefined && "default" in raw) {
     const inner = raw.default;
@@ -71,12 +56,6 @@ function unwrapDefault(raw: unknown): unknown {
   return raw;
 }
 
-/**
- * Разбирает и валидирует slim-словарь (см. `scripts/build-data.ts`).
- * Бросает с понятным текстом — битые данные лучше увидеть сразу.
- *
- * Принимает как сам объект данных, так и модуль: `parseEmojiData(await import("…/ru.json"))`.
- */
 export function parseEmojiData(input: unknown): EmojiData {
   const raw = unwrapDefault(input);
   if (!isRecord(raw) || raw.v !== 1) {
@@ -116,7 +95,6 @@ export function parseEmojiData(input: unknown): EmojiData {
   return { locale: typeof raw.locale === "string" ? raw.locale : "en", categories, emojis };
 }
 
-/** Превращает серверный эмодзи в общий вид (значение — `<a:name:id>`). */
 export function serverEmojiToEmoji(server: ServerEmoji): Emoji {
   const { id, name, animated } = server;
   return {
@@ -128,19 +106,15 @@ export function serverEmojiToEmoji(server: ServerEmoji): Emoji {
   };
 }
 
-/* ------------------------------------------------------------ тона кожи */
-
 const ZWJ = "\u200D";
 const MODIFIER_BASE = /\p{Emoji_Modifier_Base}/u;
 const TRAILING_VS16 = /\uFE0F$/;
 const TONE_MODIFIER = /\u{1F3FB}|\u{1F3FC}|\u{1F3FD}|\u{1F3FE}|\u{1F3FF}/gu;
 
-/** Поддерживает ли эмодзи тона кожи (есть сегмент-модификатор). */
 export function supportsSkinTone(emoji: string): boolean {
   return emoji.split(ZWJ).some((segment) => MODIFIER_BASE.test(segment));
 }
 
-/** Убирает модификатор тона из эмодзи. */
 export function stripSkinTone(emoji: string): string {
   return emoji
     .split(ZWJ)
@@ -148,10 +122,6 @@ export function stripSkinTone(emoji: string): string {
     .join(ZWJ);
 }
 
-/**
- * Вариант эмодзи с выбранным тоном. Алгоритм сверен с данными emojibase
- * (test/skins.test.ts): 👋 + light = 👋🏻, 🤝 в ZWJ-последовательности тон не получает.
- */
 export function skinToneVariation(emoji: string, tone: SkinTone): string {
   const base = stripSkinTone(emoji);
   if (tone === "none" || !supportsSkinTone(base)) {
@@ -169,8 +139,6 @@ export function skinToneVariation(emoji: string, tone: SkinTone): string {
     .join(ZWJ);
 }
 
-/* --------------------------------------------------------------- поиск */
-
 function scoreEmoji(emoji: Emoji, needle: string): number {
   const label = emoji.label.toLowerCase();
   if (label === needle) return 100;
@@ -186,10 +154,6 @@ function scoreEmoji(emoji: Emoji, needle: string): number {
   return 0;
 }
 
-/**
- * Поиск по названию и тегам. Совпадение в названии весит больше, чем в теге;
- * порядок при равных весах сохраняется (сортировка стабильна).
- */
 export function searchEmojis(emojis: readonly Emoji[], query: string): Emoji[] {
   const needle = query.trim().toLowerCase();
   if (!needle) return [...emojis];
@@ -203,10 +167,7 @@ export function searchEmojis(emojis: readonly Emoji[], query: string): Emoji[] {
   return found.map((item) => item.emoji);
 }
 
-/* ------------------------------------------------------ раскладка/скролл */
-
 export type Section = {
-  /** Заголовок секции; без него секция рисуется без шапки. */
   label?: string;
   emojis: readonly Emoji[];
 };
@@ -217,25 +178,20 @@ export type LayoutRow =
 
 export type Layout = {
   rows: LayoutRow[];
-  /** y-координата каждой строки от начала списка. */
   offsets: number[];
-  /** Индекс первой строки секции; `-1` у пустых секций. */
   sectionRows: number[];
   rowHeight: number;
   headerHeight: number;
   totalHeight: number;
 };
 
-/**
- * Раскладывает секции в виртуализируемые строки. Секции без эмодзи
- * игнорируются — вызывающий обычно отфильтровывает их заранее.
- */
 export function buildLayout(
   sections: readonly Section[],
   columns: number,
   rowHeight: number,
   headerHeight: number,
 ): Layout {
+  const cols = Number.isFinite(columns) ? Math.max(1, Math.trunc(columns)) : 1;
   const rows: LayoutRow[] = [];
   const offsets: number[] = [];
   const sectionRows: number[] = [];
@@ -253,8 +209,8 @@ export function buildLayout(
       offsets.push(y);
       y += headerHeight;
     }
-    for (let start = 0; start < section.emojis.length; start += columns) {
-      const emojis = section.emojis.slice(start, start + columns);
+    for (let start = 0; start < section.emojis.length; start += cols) {
+      const emojis = section.emojis.slice(start, start + cols);
       rows.push({
         kind: "emojis",
         section: sectionIndex,
@@ -281,7 +237,6 @@ function rowHeight(layout: Layout, row: number): number {
   return layout.rows[row]?.kind === "header" ? layout.headerHeight : layout.rowHeight;
 }
 
-/** Индекс первой и последней видимой строки с запасом `overscan` строк. */
 export function visibleRange(
   layout: Layout,
   scrollTop: number,
@@ -303,10 +258,6 @@ export function visibleRange(
   return [start, end];
 }
 
-/** Индекс секции, которая сейчас вверху списка (`-1`, если список пуст).
- *  У нижней границы (когда `scrollTop` упёрся в конец) подсвечивается
- *  последняя непустая секция — иначе короткая секция в конце списка
- *  никогда не стала бы активной. */
 export function sectionAt(
   layout: Layout,
   scrollTop: number,
@@ -328,7 +279,6 @@ export function sectionAt(
   return current;
 }
 
-/** y-координата начала секции (для клика по вкладке). */
 export function sectionOffset(layout: Layout, section: number): number {
   const row = layout.sectionRows[section];
   return row === undefined || row < 0 ? 0 : layout.offsets[row]!;
@@ -336,7 +286,6 @@ export function sectionOffset(layout: Layout, section: number): number {
 
 export type Cell = { row: number; col: number };
 
-/** Плоский индекс эмодзи (для id в DOM) или `-1` для строки-заголовка. */
 export function flatIndexAt(layout: Layout, cell: Cell): number {
   const row = layout.rows[cell.row];
   return row?.kind === "emojis" ? row.start + cell.col : -1;
@@ -348,7 +297,6 @@ function clampCol(layout: Layout, row: number, col: number): number {
   return Math.max(0, Math.min(col, layoutRow.emojis.length - 1));
 }
 
-/** Ближайшая строка с эмодзи в заданном направлении (заголовки перепрыгиваем). */
 function adjacentEmojiRow(layout: Layout, row: number, direction: number): number | null {
   for (let next = row + direction; next >= 0 && next < layout.rows.length; next += direction) {
     if (layout.rows[next]?.kind === "emojis") return next;
@@ -356,7 +304,6 @@ function adjacentEmojiRow(layout: Layout, row: number, direction: number): numbe
   return null;
 }
 
-/** Эмодзи в ячейке или `null`, если строка — заголовок. */
 export function emojiAt(layout: Layout, cell: Cell): Emoji | null {
   const row = layout.rows[cell.row];
   if (row?.kind !== "emojis") return null;
@@ -373,7 +320,6 @@ export function lastCell(layout: Layout): Cell | null {
   return row === null ? null : { row, col: clampCol(layout, row, Number.MAX_SAFE_INTEGER) };
 }
 
-/** Сдвиг активной ячейки; на границах списка остаётся на месте. */
 export function moveActive(layout: Layout, active: Cell, dx: number, dy: number): Cell {
   if (dy !== 0) {
     let row = active.row;
@@ -398,7 +344,6 @@ export function moveActive(layout: Layout, active: Cell, dx: number, dy: number)
   return { row: adjacent, col: dx > 0 ? 0 : clampCol(layout, adjacent, Number.MAX_SAFE_INTEGER) };
 }
 
-/** Новый scrollTop, при котором строка целиком видна (учитывая липкую шапку). */
 export function scrollToShowRow(
   layout: Layout,
   row: number,

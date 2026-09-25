@@ -25,7 +25,6 @@ function emoji(value: string): Emoji {
 const ROW = 10;
 const HEADER = 4;
 
-/** A: [e1 e2] [e3]; B: [e4 e5] */
 const sections: Section[] = [
   { label: "A", emojis: [emoji("1"), emoji("2"), emoji("3")] },
   { label: "B", emojis: [emoji("4"), emoji("5")] },
@@ -58,6 +57,20 @@ describe("buildLayout", () => {
     );
     assert.deepEqual(withEmpty.sectionRows, [-1, 0]);
     assert.equal(withEmpty.rows.length, 2);
+  });
+
+  it("не зацикливается на нулевых, дробных и NaN-колонках", () => {
+    const zero = buildLayout([{ emojis: [emoji("1"), emoji("2"), emoji("3")] }], 0, ROW, HEADER);
+    assert.deepEqual(
+      zero.rows.map((row) => (row.kind === "emojis" ? row.emojis.map((e) => e.value).join("") : "")),
+      ["1", "2", "3"],
+    );
+
+    const nan = buildLayout([{ emojis: [emoji("1")] }], Number.NaN, ROW, HEADER);
+    assert.equal(nan.rows.length, 1);
+
+    const fractional = buildLayout([{ emojis: [emoji("1"), emoji("2")] }], 1.5, ROW, HEADER);
+    assert.equal(fractional.rows.length, 2);
   });
 });
 

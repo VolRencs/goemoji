@@ -1,15 +1,3 @@
-/**
- * Генерация slim-словарей из `emojibase-data`.
- *
- * Запуск: `pnpm data` (пакет `emojibase-data` — devDependency).
- *
- * Формат (v1):
- *   { v: 1, locale, categories: [{ key, label }], emojis: [[emoji, label, tags, category]] }
- *
- * Что выбрасываем: группу `component` (модификаторы тона кожи) и записи без
- * группы (региональные индикаторы флагов). Тона кожи не храним — варианты
- * генерируются в рантайме (`skinToneVariation`), сверено с emojibase: расхождений нет.
- */
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { brotliCompressSync, gzipSync } from "node:zlib";
