@@ -3,6 +3,38 @@
 Формат: [Keep a Changelog](https://keepachangelog.com/ru/1.1.0/),
 версии — [Semantic Versioning](https://semver.org/lang/ru/).
 
+## [0.3.1] — 2026-10-28
+
+### Добавлено
+
+- `goemoji/discord`: `stripVariationSelectors`, `toDiscordEmoji` и
+  `toDiscordReaction` — общие преобразования для Discord-компонентов и реакций.
+- Проп `autoFocus` у `EmojiPicker`.
+- Подписи `categories` и `defaultTone` в `Labels`.
+
+### Изменено
+
+- Данные пересобраны из `emojibase-data` 18.0.0: 1923 эмодзи, обновлённые
+  названия и теги. Часть значений больше не содержит избыточный `FE0F`.
+- `customEmojiUrl` по умолчанию использует размер 64 и приводит запрошенный
+  размер к степени двойки, как требует Discord CDN.
+- `tsdown` и `@tsdown/css` обновлены до 0.23.3 для сборки с TypeScript 7.
+
+### Исправлено
+
+- Сборка d.ts с TypeScript 7 и `pnpm install` через `prepare`.
+- `pnpm check` больше не зависит от уже собранного `dist`.
+- Поиск по тегам теперь регистронезависимый (`Дракула`, `OK`, `Christmas`).
+- `parseEmojiData` отвергает дробные и NaN-индексы категорий.
+- localStorage-состояние читается после монтирования — без hydration mismatch.
+- `←/→/Home/End` не мешают редактированию поиска и работе IME.
+- Анимация прокрутки отменяется при смене запроса, данных или выборе.
+- Клик по вкладке в коротком списке сохраняет правильную подсветку.
+- Старые значения «Недавних» с `FE0F` продолжают находиться после обновления
+  данных.
+- Ячейки списка получили accessible name; вкладки — корректную подпись,
+  `aria-controls` и roving `tabIndex`.
+
 ## [0.3.0] — 2026-09-25
 
 ### Добавлено
@@ -40,6 +72,7 @@
 поиском по названиям и тегам, тонами кожи, «Недавними» и серверными эмодзи Discord.
 Словари ru/en собраны из emojibase-data.
 
+[0.3.1]: https://github.com/VolRencs/goemoji/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/VolRencs/goemoji/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/VolRencs/goemoji/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/VolRencs/goemoji/releases/tag/v0.1.0

@@ -20,7 +20,7 @@ jobs:
           cache: pnpm
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --ignore-scripts
 
       - name: Typecheck
         run: pnpm check
@@ -28,8 +28,13 @@ jobs:
       - name: Tests
         run: pnpm test
 
-      - name: Build
-        run: pnpm build
+      - name: Check generated data
+        run: |
+          pnpm data
+          git diff --exit-code -- data
+
+      - name: Package lint, build and attw
+        run: pnpm lint:package
 
       - name: Size budget
         run: pnpm size

@@ -5,18 +5,18 @@ tones, recents, and Discord server emoji. The only dependency is `react` (a peer
 dependency). The `ru`/`en` dictionaries ship inside the package, so nothing is
 fetched from a third-party CDN at runtime.
 
-The build is about 6.2 KB gzip of JavaScript and 1.2 KB gzip of CSS. The
-dictionaries are 50.2 KB gzip (`ru`) and 38.1 KB gzip (`en`) and are loaded
+The build is about 6.8 KB gzip of JavaScript and 1.3 KB gzip of CSS. The
+dictionaries are 50.4 KB gzip (`ru`) and 38.4 KB gzip (`en`) and are loaded
 lazily, so they never end up in the initial bundle.
 
 ## Features
 
-- 1914 emoji per locale across 9 categories, with tabs and sticky section headers.
+- 1923 emoji per locale across 9 categories, with tabs and sticky section headers.
 - Search over localized names and tags, with exact matches ranked first. Server
   emoji are searchable alongside Unicode and get their own section.
 - Skin tones: one base glyph plus five modifiers. Variants are generated at
   runtime instead of being stored, and are checked against emojibase in the test
-  suite (1650+ comparisons, no mismatches).
+  suite (1660+ comparisons, no mismatches).
 - Recents: up to 24 emoji in `localStorage`, with a configurable key (for
   example, one per Discord guild).
 - Server emoji rendered as images, searchable, with an optional guild icon on
@@ -44,7 +44,7 @@ declarations.
 Install straight from the repository by tag:
 
 ```bash
-pnpm add github:VolRencs/goemoji#v0.3.0
+pnpm add github:VolRencs/goemoji#v0.3.1
 ```
 
 ## Quick start
@@ -103,7 +103,7 @@ const data = parseEmojiData(ru);
 {
   "v": 1,
   "locale": "ru",
-  "categories": [{ "key": "smileys-emotion", "label": "Смайлики и люди" }],
+  "categories": [{ "key": "smileys-emotion", "label": "Смайлики и эмоции" }],
   "emojis": [["😀", "улыбающееся лицо", "улыбка смех", 0]]
 }
 ```
@@ -112,6 +112,11 @@ Each emoji row is `[emoji, label, space-separated tags, category index]`.
 Skin-tone components (the `component` group) and standalone regional indicators
 are excluded; full flags remain. Skin-tone variants are produced at runtime by
 `skinToneVariation`.
+
+Emojibase 18 uses fully-qualified sequences, so some `value` strings no longer
+contain a redundant `U+FE0F`. If you store selected emoji, compare them with
+`sameEmojiValue` (or normalize them with `stripVariationSelectors`) rather than
+comparing raw code points.
 
 You can build a custom dictionary in the same format and pass it to
 `parseEmojiData`; the component does not require data to come from this package.
@@ -134,6 +139,7 @@ You can build a custom dictionary in the same format and pass it to
 | `onSelect` | `(emoji: Emoji) => void` | — | Required selection handler |
 | `onEscape` | `() => void` | — | Called on Escape once the tone menu is closed |
 | `serverIconUrl` | `string` | — | Image used on the server tab instead of the default icon |
+| `autoFocus` | `boolean` | `true` | Focus the search field when the picker mounts |
 | `className` | `string` | — | Extra class on the root `.ge-root` element |
 
 The selected tone is stored under the `goemoji:tone` `localStorage` key unless
@@ -160,7 +166,7 @@ reset to `null` until the new one resolves. Effects do not run during SSR, so
 | `EmojiData` | `locale: string`, `categories: Category[]`, `emojis: Emoji[]` |
 | `Category` | `key: string`, `label: string` |
 | `SlimEmoji` | `[emoji, label, tags, category]` — a raw dictionary row |
-| `Labels` | `search`, `empty`, `recent`, `server`, `skinTone`, `skinTones` |
+| `Labels` | `search`, `empty`, `recent`, `server`, optionally `categories` and `defaultTone`, plus `skinTone` and `skinTones` |
 
 All types, including `EmojiPickerProps`, are exported from the package root.
 
@@ -172,7 +178,10 @@ A React-free entry point for bots, API routes, and reaction handling.
 | --- | --- |
 | `parseCustomEmoji(value)` | Parses `<:name:id>` / `<a:name:id>`; returns `null` for Unicode |
 | `customEmojiToString({ name, id, animated? })` | Builds `<a:name:id>` / `<:name:id>` |
-| `customEmojiUrl(id, animated?, size?)` | Discord CDN URL; `size` is clamped to 16–4096 and defaults to 48 |
+| `customEmojiUrl(id, animated?, size?)` | Discord CDN URL; `size` is clamped to a power of two between 16 and 4096 and defaults to 64 |
+| `toDiscordEmoji(value)` | Component/reaction emoji object for the Discord API; normalizes Unicode variation selectors |
+| `toDiscordReaction(value)` | `name:id` for custom emoji, normalized glyph for Unicode |
+| `stripVariationSelectors(value)` | Removes U+FE0E/U+FE0F only, preserving ZWJ sequences |
 | `normalizeEmojiText(value)` | Strips U+FE0E/U+FE0F variation selectors and ZWJ |
 | `sameEmojiValue(saved, name, identifier)` | Matches a stored value against a reaction: custom emoji by id, Unicode by normalized text |
 
@@ -187,16 +196,17 @@ sameEmojiValue("❤️", "❤", "❤"); // true
 
 | Key | Action |
 | --- | --- |
-| `←` / `→` | Previous or next emoji; wraps to the adjacent row at the edge |
+| `←` / `→` | Previous or next emoji when the search field is empty; while typing they move the text cursor |
 | `↑` / `↓` | Row above or below, keeping the column where possible |
 | `PageUp` / `PageDown` | Five rows up or down |
-| `Home` / `End` | First or last emoji in the list |
+| `Home` / `End` | First or last emoji when the search field is empty |
 | `Enter` | Select the active emoji |
 | `Esc` | Close the tone menu, then call `onEscape` |
 
 Focus stays in the search field; the list is linked to it through
 `aria-activedescendant`, following the combobox pattern. While the tone menu is
 open, arrows, `Home`, `End`, and `Esc` control the menu rather than the list.
+Category tabs support arrow keys, `Home`, and `End`.
 
 ## Styling
 
@@ -234,8 +244,9 @@ the variables cover most cases.
 
 - The search field is a `combobox` with `aria-controls` and
   `aria-activedescendant`; the list is a `listbox`, and cells are `option`
-  elements with `aria-selected`.
-- Category tabs use `tablist`/`tab` with `aria-selected`.
+  elements with accessible names via `aria-label`.
+- Category tabs use `tablist`/`tab` with `aria-selected`, roving `tabIndex`, and
+  arrow-key navigation.
 - The tone menu uses `menu`/`menuitemradio` with `aria-checked`; focus returns
   to the button on selection or close. Navigation supports arrows, `Home`,
   `End`, and `Esc`.
@@ -253,7 +264,7 @@ plus a small overscan, exist in the DOM. On scroll the range is recomputed in a
 window actually moves. Section headers stick to the top edge, and clicking a tab
 highlights it immediately and glides to the section with a short animation.
 
-Search runs over the in-memory emoji array (1914 entries per locale), so results
+Search runs over the in-memory emoji array (1923 entries per locale), so results
 update on every keystroke without debouncing.
 
 ## License

@@ -25,6 +25,8 @@ describe("тона кожи", () => {
   it("подставляет и меняет тон", () => {
     assert.equal(skinToneVariation("👋", "light"), "👋🏻");
     assert.equal(skinToneVariation("👋🏽", "dark"), "👋🏿");
+    assert.equal(skinToneVariation("🫹", "dark"), "🫹🏿");
+    assert.equal(skinToneVariation("🫺", "light"), "🫺🏻");
   });
 
   it("🤝 внутри ZWJ-последовательности тон не получает", () => {

@@ -18,6 +18,10 @@
     "erasableSyntaxOnly": true,
     "noUncheckedSideEffectImports": true,
     "allowImportingTsExtensions": true,
+    "paths": {
+      "goemoji": ["./src/index.ts"],
+      "goemoji/discord": ["./src/discord.ts"]
+    },
     "resolveJsonModule": true,
     "skipLibCheck": true,
     "noEmit": true,

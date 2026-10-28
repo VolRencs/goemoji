@@ -33,6 +33,7 @@ import {
   type ServerEmoji,
   type SkinTone,
 } from "./data.ts";
+import { stripVariationSelectors } from "./discord.ts";
 import { EmojiList } from "./EmojiList.tsx";
 import {
   GRID_GAP,
@@ -136,6 +137,7 @@ export type EmojiPickerProps = {
   onSelect: (emoji: Emoji) => void;
   onEscape?: (() => void) | undefined;
   serverIconUrl?: string | undefined;
+  autoFocus?: boolean | undefined;
   className?: string | undefined;
 };
 
@@ -152,6 +154,7 @@ export function EmojiPicker({
   onSelect,
   onEscape,
   serverIconUrl,
+  autoFocus = true,
   className,
 }: EmojiPickerProps) {
   const gridColumns = Number.isFinite(columns) ? Math.max(1, Math.trunc(columns)) : DEFAULT_COLUMNS;
@@ -170,20 +173,31 @@ export function EmojiPicker({
   const pinnedRef = useRef<number | null>(null);
   const glideRef = useRef<(() => void) | null>(null);
   const [toneOpen, setToneOpen] = useState(false);
-  const [recent, setRecent] = useState<string[]>(() =>
-    recentKey === false ? [] : readRecent(recentKey),
-  );
-  const [internalTone, setInternalTone] = useState<SkinTone>(readTone);
+  const [recent, setRecentState] = useState<string[]>([]);
+  const recentRef = useRef<string[]>([]);
+  const [internalTone, setInternalTone] = useState<SkinTone>("none");
   const tone = skinTone ?? internalTone;
+
+  const setRecent = useCallback((next: string[]) => {
+    recentRef.current = next;
+    setRecentState(next);
+  }, []);
 
   useEffect(() => {
     setRecent(recentKey === false ? [] : readRecent(recentKey));
-  }, [recentKey]);
+  }, [recentKey, setRecent]);
+
+  useEffect(() => {
+    if (skinTone !== undefined) return;
+    const next = readTone();
+    setInternalTone((previous) => (previous === next ? previous : next));
+  }, [skinTone]);
 
   const generatedId = useId().replace(/[^\w-]/g, "");
   const listId = `ge-list-${generatedId}`;
   const rootRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
   const frameRef = useRef<number | null>(null);
   const toneButtonRef = useRef<HTMLButtonElement>(null);
   const tonePopRef = useRef<HTMLDivElement>(null);
@@ -191,6 +205,11 @@ export function EmojiPicker({
 
   const pinSection = useCallback((index: number | null) => {
     pinnedRef.current = index;
+  }, []);
+
+  const cancelGlide = useCallback(() => {
+    glideRef.current?.();
+    glideRef.current = null;
   }, []);
 
   const serverEntries = useMemo(
@@ -201,14 +220,22 @@ export function EmojiPicker({
     () => [...data.emojis, ...serverEntries],
     [data.emojis, serverEntries],
   );
-  const emojiByValue = useMemo(
-    () => new Map(merged.map((emoji) => [emoji.value, emoji])),
-    [merged],
-  );
+  const emojiByValue = useMemo(() => {
+    const map = new Map<string, Emoji>();
+    for (const emoji of merged) {
+      map.set(emoji.value, emoji);
+      const normalized = stripVariationSelectors(emoji.value);
+      if (normalized && !map.has(normalized)) map.set(normalized, emoji);
+    }
+    return map;
+  }, [merged]);
   const recentEmojis = useMemo(
     () =>
       recent
-        .map((value) => emojiByValue.get(value))
+        .map(
+          (value) =>
+            emojiByValue.get(value) ?? emojiByValue.get(stripVariationSelectors(value)),
+        )
         .filter((emoji): emoji is Emoji => emoji !== undefined),
     [recent, emojiByValue],
   );
@@ -279,7 +306,7 @@ export function EmojiPicker({
     let active = current;
     if (active !== null) {
       const target = sectionOffset(layout, active);
-      if (Math.abs(scrollTop - target) <= 1 || scrollTop >= maxScroll - 1) {
+      if (Math.abs(scrollTop - target) <= 1 || (maxScroll > 0 && scrollTop >= maxScroll - 1)) {
         pinSection(null);
         active = null;
       }
@@ -317,16 +344,22 @@ export function EmojiPicker({
 
   useEffect(() => () => {
     if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
-    glideRef.current?.();
-  }, []);
+    cancelGlide();
+  }, [cancelGlide]);
 
   useEffect(() => {
     syncView();
   }, [syncView]);
 
   useEffect(() => {
+    cancelGlide();
+    pinSection(null);
     setActive(null);
-  }, [layout]);
+  }, [cancelGlide, layout, pinSection]);
+
+  useEffect(() => {
+    if (active && (active.row < view.start || active.row >= view.end)) setActive(null);
+  }, [active, view.end, view.start]);
 
   useEffect(() => {
     const element = scrollRef.current;
@@ -429,44 +462,71 @@ export function EmojiPicker({
     (index: number) => {
       pinSection(index);
       syncView();
-      glideRef.current?.();
-      glideRef.current = null;
+      cancelGlide();
       const element = scrollRef.current;
       if (element) glideRef.current = glideTo(element, sectionOffset(layout, index), syncView);
     },
-    [layout, pinSection, syncView],
+    [cancelGlide, layout, pinSection, syncView],
   );
 
+  const onTabsKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (
+      event.key !== "ArrowLeft" &&
+      event.key !== "ArrowRight" &&
+      event.key !== "Home" &&
+      event.key !== "End"
+    ) {
+      return;
+    }
+    const tabs = Array.from(
+      event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]'),
+    );
+    if (!tabs.length) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const current = Math.max(
+      0,
+      tabs.indexOf(document.activeElement as HTMLButtonElement),
+    );
+    const index =
+      event.key === "Home"
+        ? 0
+        : event.key === "End"
+          ? tabs.length - 1
+          : (current + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length;
+    tabs[index]?.focus();
+    selectSection(index);
+  };
+
   const stopGlide = useCallback(() => {
-    glideRef.current?.();
-    glideRef.current = null;
+    cancelGlide();
     pinSection(null);
-  }, [pinSection]);
+  }, [cancelGlide, pinSection]);
 
   const select = useCallback(
     (emoji: Emoji) => {
+      stopGlide();
       onSelect(emoji);
       if (recentKey === false) return;
-      setRecent((previous) => {
-        const next = [emoji.value, ...previous.filter((value) => value !== emoji.value)].slice(
-          0,
-          MAX_RECENT,
-        );
-        writeRecent(recentKey, next);
-        return next;
-      });
+      const value = stripVariationSelectors(emoji.value);
+      const next = [
+        value,
+        ...recentRef.current.filter((recentValue) => recentValue !== value),
+      ].slice(0, MAX_RECENT);
+      setRecent(next);
+      writeRecent(recentKey, next);
     },
-    [onSelect, recentKey],
+    [onSelect, recentKey, setRecent, stopGlide],
   );
 
   const changeQuery = useCallback(
     (value: string) => {
-      pinSection(null);
+      stopGlide();
       setQuery(value);
       setActive(null);
       jumpTo(0);
     },
-    [jumpTo, pinSection],
+    [jumpTo, stopGlide],
   );
 
   const changeTone = useCallback(
@@ -483,6 +543,7 @@ export function EmojiPicker({
   );
 
   const onKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (event.nativeEvent.isComposing || event.defaultPrevented) return;
     if (event.key === "Escape") {
       if (toneOpen) {
         event.preventDefault();
@@ -490,6 +551,17 @@ export function EmojiPicker({
         return;
       }
       onEscape?.();
+      return;
+    }
+    if (event.target !== searchRef.current) return;
+    if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+    if (
+      query.trim().length > 0 &&
+      (event.key === "ArrowLeft" ||
+        event.key === "ArrowRight" ||
+        event.key === "Home" ||
+        event.key === "End")
+    ) {
       return;
     }
     const current = active ?? firstCell(layout);
@@ -536,7 +608,13 @@ export function EmojiPicker({
     stopGlide();
     setActive(next);
     const from = scrollRef.current?.scrollTop ?? 0;
-    const top = scrollToShowRow(layout, next.row, from, viewportHeight, layout.headerHeight);
+    const top = scrollToShowRow(
+      layout,
+      next.row,
+      from,
+      viewportHeight,
+      searching ? 0 : layout.headerHeight,
+    );
     if (Math.abs(top - from) > 1) jumpTo(top);
   };
 
@@ -557,6 +635,7 @@ export function EmojiPicker({
     >
       <div className="ge-top">
         <input
+          ref={searchRef}
           className="ge-search"
           type="text"
           value={query}
@@ -564,11 +643,13 @@ export function EmojiPicker({
           aria-label={labels.search}
           role="combobox"
           aria-expanded
+          aria-autocomplete="list"
+          aria-haspopup="listbox"
           aria-controls={listId}
           aria-activedescendant={activeId ?? undefined}
           autoComplete="off"
           spellCheck={false}
-          autoFocus
+          autoFocus={autoFocus}
           onChange={(event) => changeQuery(event.target.value)}
         />
         <div
@@ -605,6 +686,8 @@ export function EmojiPicker({
                 aria-checked={tone === "none"}
                 className="ge-tone-item"
                 data-active={tone === "none" ? "" : undefined}
+                title={labels.defaultTone ?? labels.skinTone}
+                aria-label={labels.defaultTone ?? labels.skinTone}
                 onClick={() => changeTone("none")}
               >
                 {SKIN_TONE_BASE}
@@ -630,13 +713,22 @@ export function EmojiPicker({
       </div>
 
       {tabs.length > 0 && (
-        <div className="ge-tabs" role="tablist" aria-label={labels.search}>
+        <div
+          className="ge-tabs"
+          role="tablist"
+          aria-label={labels.categories ?? labels.search}
+          onKeyDown={onTabsKeyDown}
+        >
           {tabs.map((tab, index) => (
             <button
               key={`${tab.title}-${index}`}
+              id={`${listId}-tab-${index}`}
               type="button"
               role="tab"
               aria-selected={index === view.section}
+              aria-controls={listId}
+              aria-label={tab.title}
+              tabIndex={index === view.section ? 0 : -1}
               className="ge-tab"
               data-active={index === view.section ? "" : undefined}
               title={tab.title}
@@ -662,8 +754,6 @@ export function EmojiPicker({
         onScroll={onScroll}
         onInterrupt={stopGlide}
         onSelect={select}
-        onHover={setActive}
-        onLeave={() => setActive(null)}
       />
     </div>
   );
@@ -685,7 +775,11 @@ function readRecent(key: string): string[] {
     if (!raw) return [];
     const parsed: unknown = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter((value): value is string => typeof value === "string").slice(0, MAX_RECENT);
+    const values = parsed
+      .filter((value): value is string => typeof value === "string")
+      .map(stripVariationSelectors)
+      .filter((value) => value.length > 0);
+    return [...new Set(values)].slice(0, MAX_RECENT);
   } catch {
     return [];
   }

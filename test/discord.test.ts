@@ -6,6 +6,9 @@ import {
   normalizeEmojiText,
   parseCustomEmoji,
   sameEmojiValue,
+  stripVariationSelectors,
+  toDiscordEmoji,
+  toDiscordReaction,
 } from "../src/discord.ts";
 
 describe("parseCustomEmoji", () => {
@@ -47,14 +50,14 @@ describe("customEmojiToString", () => {
 
 describe("customEmojiUrl", () => {
   it("подставляет формат и размер", () => {
-    assert.equal(customEmojiUrl("42"), "https://cdn.discordapp.com/emojis/42.png?size=48");
+    assert.equal(customEmojiUrl("42"), "https://cdn.discordapp.com/emojis/42.png?size=64");
     assert.equal(
       customEmojiUrl("42", true, 96),
-      "https://cdn.discordapp.com/emojis/42.gif?size=96",
+      "https://cdn.discordapp.com/emojis/42.gif?size=128",
     );
   });
 
-  it("клампит размер к диапазону Discord", () => {
+  it("клампит размер и приводит его к степени двойки", () => {
     assert.equal(customEmojiUrl("42", false, 0), "https://cdn.discordapp.com/emojis/42.png?size=16");
     assert.equal(
       customEmojiUrl("42", false, 99999),
@@ -62,12 +65,40 @@ describe("customEmojiUrl", () => {
     );
     assert.equal(
       customEmojiUrl("42", false, Number.NaN),
-      "https://cdn.discordapp.com/emojis/42.png?size=48",
+      "https://cdn.discordapp.com/emojis/42.png?size=64",
     );
     assert.equal(
       customEmojiUrl("42", false, 48.7),
-      "https://cdn.discordapp.com/emojis/42.png?size=48",
+      "https://cdn.discordapp.com/emojis/42.png?size=64",
     );
+    assert.equal(customEmojiUrl("42", false, 17), "https://cdn.discordapp.com/emojis/42.png?size=16");
+    assert.equal(customEmojiUrl("42", false, 100), "https://cdn.discordapp.com/emojis/42.png?size=128");
+  });
+});
+
+describe("stripVariationSelectors", () => {
+  it("убирает только вариационные селекторы, сохраняя ZWJ", () => {
+    assert.equal(stripVariationSelectors("❤️"), "❤");
+    assert.equal(stripVariationSelectors("🏳️‍🌈"), "🏳‍🌈");
+    assert.equal(stripVariationSelectors("😀"), "😀");
+  });
+});
+
+describe("Discord-представления", () => {
+  it("собирает emoji для компонента", () => {
+    assert.deepEqual(toDiscordEmoji("<a:blob:42>"), {
+      id: "42",
+      name: "blob",
+      animated: true,
+    });
+    assert.deepEqual(toDiscordEmoji("❤️"), { name: "❤" });
+    assert.equal(toDiscordEmoji(""), undefined);
+    assert.equal(toDiscordEmoji(null), undefined);
+  });
+
+  it("собирает emoji для реакции", () => {
+    assert.equal(toDiscordReaction("<:blob:42>"), "blob:42");
+    assert.equal(toDiscordReaction("❤️"), "❤");
   });
 });
 

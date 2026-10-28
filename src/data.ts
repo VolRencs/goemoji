@@ -83,7 +83,7 @@ export function parseEmojiData(input: unknown): EmojiData {
       throw new Error(`goemoji: эмодзи #${index} повреждён`);
     }
     const category = item[3];
-    if (category < 0 || category >= categories.length) {
+    if (!Number.isInteger(category) || category < 0 || category >= categories.length) {
       throw new Error(`goemoji: эмодзи #${index} ссылается на неизвестную категорию`);
     }
     if (!item[0]) {
@@ -107,7 +107,9 @@ export function serverEmojiToEmoji(server: ServerEmoji): Emoji {
 }
 
 const ZWJ = "\u200D";
-const MODIFIER_BASE = /\p{Emoji_Modifier_Base}/u;
+// Node/V8 may lag the Unicode version used by emojibase. Keep new modifier
+// bases here until \p{Emoji_Modifier_Base} in the runtime catches up.
+const MODIFIER_BASE = /[\p{Emoji_Modifier_Base}\u{1FAF9}\u{1FAFA}]/u;
 const TRAILING_VS16 = /\uFE0F$/;
 const TONE_MODIFIER = /\u{1F3FB}|\u{1F3FC}|\u{1F3FD}|\u{1F3FE}|\u{1F3FF}/gu;
 
@@ -145,8 +147,9 @@ function scoreEmoji(emoji: Emoji, needle: string): number {
   if (label.startsWith(needle)) return 60;
   if (label.includes(needle)) return 40;
 
-  for (const tag of emoji.tags.split(" ")) {
-    if (!tag) continue;
+  for (const rawTag of emoji.tags.split(" ")) {
+    if (!rawTag) continue;
+    const tag = rawTag.toLowerCase();
     if (tag === needle) return 25;
     if (tag.startsWith(needle)) return 15;
     if (tag.includes(needle)) return 8;

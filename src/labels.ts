@@ -5,7 +5,9 @@ export type Labels = {
   empty: string;
   recent: string;
   server: string;
+  categories?: string | undefined;
   skinTone: string;
+  defaultTone?: string | undefined;
   skinTones: Record<Exclude<SkinTone, "none">, string>;
 };
 
@@ -14,7 +16,9 @@ const RU: Labels = {
   empty: "Ничего не найдено",
   recent: "Недавние",
   server: "Сервер",
+  categories: "Категории",
   skinTone: "Тон эмодзи",
+  defaultTone: "Без тона",
   skinTones: {
     light: "Светлый тон",
     "medium-light": "Средне-светлый тон",
@@ -29,7 +33,9 @@ const EN: Labels = {
   empty: "No emoji found",
   recent: "Recent",
   server: "Server",
+  categories: "Categories",
   skinTone: "Emoji skin tone",
+  defaultTone: "Default skin tone",
   skinTones: {
     light: "Light skin tone",
     "medium-light": "Medium-light skin tone",

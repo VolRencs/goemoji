@@ -1,6 +1,6 @@
 {
   "name": "goemoji",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Лёгкий эмодзи-пикер для React: вкладки категорий, поиск, скины и серверные эмодзи Discord.",
   "license": "MIT",
   "author": "VolRencs",
@@ -14,7 +14,7 @@
   "engines": {
     "node": ">=24"
   },
-  "packageManager": "pnpm@12.6.0",
+  "packageManager": "pnpm@12.14.0+sha512.c18ba6d87993d3d164cb5e8948f32b2c06ee854487e06cd8d86781342fb3e5bb4634367034711e86802baa9c37bea906ce1929ad08d70884c97d801df13389a6",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/VolRencs/goemoji.git"
@@ -64,27 +64,28 @@
     "test": "node --test test/*.test.ts",
     "data": "node scripts/build-data.ts",
     "size": "node scripts/size-budget.ts",
-    "smoke": "node scripts/smoke.ts",
+    "smoke": "node scripts/smoke.mjs",
     "lint:package": "LINT_PACKAGE=1 tsdown",
     "dev": "vite --config demo/vite.config.ts",
     "prepare": "tsdown",
-    "prepublishOnly": "pnpm lint:package && pnpm check && pnpm test && pnpm build && pnpm size && pnpm smoke"
+    "prepublishOnly": "pnpm check && pnpm test && pnpm lint:package && pnpm size && pnpm smoke"
   },
   "peerDependencies": {
     "react": "^19"
   },
   "devDependencies": {
     "@arethetypeswrong/core": "^0.18.5",
-    "@tsdown/css": "^0.23.0",
-    "@types/node": "^26.6.2",
+    "@tsdown/css": "^0.23.3",
+    "@types/node": "^26.6.5",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
-    "emojibase-data": "^17.0.0",
-    "publint": "^0.3.24",
-    "react": "^19.3.0",
-    "react-dom": "^19.3.0",
-    "tsdown": "^0.23.0",
+    "emojibase": "^18.0.0",
+    "emojibase-data": "^18.0.0",
+    "publint": "^0.3.25",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "tsdown": "^0.23.3",
     "typescript": "^7.0.2",
-    "vite": "^8.3.1"
+    "vite": "^8.3.5"
   }
 }

@@ -18,8 +18,6 @@ type EmojiListProps = {
   onScroll: () => void;
   onInterrupt: () => void;
   onSelect: (emoji: Emoji) => void;
-  onHover: (cell: Cell) => void;
-  onLeave: () => void;
 };
 
 export function EmojiList({
@@ -36,8 +34,6 @@ export function EmojiList({
   onScroll,
   onInterrupt,
   onSelect,
-  onHover,
-  onLeave,
 }: EmojiListProps) {
   const rows = layout.rows.slice(start, end);
   const windowTop = layout.offsets[start] ?? 0;
@@ -53,7 +49,6 @@ export function EmojiList({
       onWheel={onInterrupt}
       onTouchStart={onInterrupt}
       onPointerDown={onInterrupt}
-      onMouseLeave={onLeave}
     >
       <div className="ge-sizer" style={{ height: layout.totalHeight }}>
         <div className="ge-window" style={{ transform: `translateY(${windowTop}px)` }}>
@@ -76,9 +71,6 @@ export function EmojiList({
                     tone={tone}
                     active={active?.row === rowIndex && active.col === col}
                     onSelect={onSelect}
-                    onHover={onHover}
-                    row={rowIndex}
-                    col={col}
                   />
                 ))}
               </div>
@@ -86,8 +78,16 @@ export function EmojiList({
           })}
         </div>
       </div>
-      {layout.rows.length === 0 && <p className="ge-empty">{emptyLabel}</p>}
-      {stickyLabel !== null && <div className="ge-sticky">{stickyLabel}</div>}
+      {layout.rows.length === 0 && (
+        <p className="ge-empty" role="status">
+          {emptyLabel}
+        </p>
+      )}
+      {stickyLabel !== null && (
+        <div className="ge-sticky" aria-hidden="true">
+          {stickyLabel}
+        </div>
+      )}
     </div>
   );
 }
@@ -97,23 +97,20 @@ type EmojiCellProps = {
   emoji: Emoji;
   tone: SkinTone;
   active: boolean;
-  row: number;
-  col: number;
   onSelect: (emoji: Emoji) => void;
-  onHover: (cell: Cell) => void;
 };
 
-function EmojiCell({ id, emoji, tone, active, row, col, onSelect, onHover }: EmojiCellProps) {
+function EmojiCell({ id, emoji, tone, active, onSelect }: EmojiCellProps) {
   const server = emoji.server;
   return (
     <div
       id={id}
       role="option"
+      aria-label={emoji.label}
       aria-selected={active}
       className="ge-cell"
       data-active={active ? "" : undefined}
       title={emoji.label}
-      onMouseEnter={() => onHover({ row, col })}
       onClick={() => onSelect(emoji)}
     >
       {server ? (

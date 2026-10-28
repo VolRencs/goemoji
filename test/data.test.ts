@@ -62,6 +62,18 @@ describe("parseEmojiData", () => {
         }),
       /неизвестную категорию/,
     );
+    for (const category of [0.5, Number.NaN, Number.POSITIVE_INFINITY]) {
+      assert.throws(
+        () =>
+          parseEmojiData({
+            v: 1,
+            categories: minimal.categories,
+            emojis: [["😀", "улыбается", "", category]],
+          }),
+        /неизвестную категорию/,
+        String(category),
+      );
+    }
   });
 });
 

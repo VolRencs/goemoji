@@ -3,8 +3,9 @@
 ## emojibase-data
 
 Файлы `data/ru.json` и `data/en.json` сгенерированы из пакета
-[`emojibase-data`](https://github.com/milesj/emojibase) (лицензия MIT) скриптом
-`scripts/build-data.ts`.
+[`emojibase-data`](https://github.com/milesj/emojibase) версии 18.0.0
+(лицензия MIT) скриптом `scripts/build-data.ts`. Данные соответствуют Emoji 18
+и CLDR 49 (beta 1).
 
 ## Unicode CLDR
 

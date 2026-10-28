@@ -41,6 +41,16 @@ describe("searchEmojis", () => {
     assert.deepEqual(searchEmojis([inner, prefix, exact], "кот"), [exact, prefix, inner]);
   });
 
+  it("не зависит от регистра тегов", () => {
+    const vampire = emoji("🧛", "вампир", "Дракула граф");
+    assert.deepEqual(searchEmojis([vampire], "дракула"), [vampire]);
+    assert.deepEqual(searchEmojis([vampire], "Дракула"), [vampire]);
+
+    const ok = emoji("👌", "жест", "OK");
+    assert.deepEqual(searchEmojis([ok], "ok"), [ok]);
+    assert.deepEqual(searchEmojis([ok], "OK"), [ok]);
+  });
+
   it("находит серверные эмодзи по частям имени", () => {
     assert.deepEqual(searchEmojis(all, "parrot"), [parrot]);
     assert.deepEqual(searchEmojis(all, "party_parrot"), [parrot]);
